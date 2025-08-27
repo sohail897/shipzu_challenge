@@ -139,7 +139,11 @@
           rtoPercent.textContent = pct(k.rto_percent ?? 0);
           ordersAtRisk.textContent = fmt(k.orders_at_risk ?? 0);
           drr.textContent = Number(k.drr ?? 0).toFixed(3);
-          
+
+          // set submission time directly from JSON
+          if (sub.submitted_at_ist) {
+            document.getElementById("lastUpdated").textContent = "Submitted at " + sub.submitted_at_ist;
+          }
 
           evaluate(sub);
           btnEvaluate.addEventListener("click", () => evaluate(sub));
@@ -157,15 +161,6 @@
           orders_at_risk: Number(tpRisk.value),
         };
         const rules = [];
-
-        // --- update submission time on evaluate ---
-        const now = new Date();
-        const istOptions = { timeZone: 'Asia/Kolkata', hour12: false, 
-                             year: 'numeric', month: '2-digit', day: '2-digit',
-                             hour: '2-digit', minute: '2-digit', second: '2-digit' };
-        const submittedTime = now.toLocaleString('sv-SE', istOptions);
-        document.getElementById("lastUpdated").textContent = "Submitted at " + submittedTime;
-        // ------------------------------------------
 
         const del = Number(k.delivered_percent || 0);
         const deliveredGood = del >= thr.delivered_percent;
@@ -195,7 +190,7 @@
         }
 
         const payload = {
-          submitted_at_ist: submittedTime,
+          submitted_at_ist: sub.submitted_at_ist || null,
           kpi: sub.kpi || {},
           thresholds_used: thr,
           rules_computed_client: rules

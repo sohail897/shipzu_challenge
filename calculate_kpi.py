@@ -43,7 +43,7 @@ drr = delivered_in_last_7_days / 7.0
 
 # Creating submission.json 
 submission_data = {
-    "submitted_at_ist": now_ist.isoformat(),
+   "submitted_at_ist": now_ist.strftime("%I:%M %p"),
     "kpi": {
         "delivered_percent": round(delivered_percent, 2),
         "rto_percent": round(rto_percent, 2),
