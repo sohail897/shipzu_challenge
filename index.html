@@ -140,7 +140,7 @@
           ordersAtRisk.textContent = fmt(k.orders_at_risk ?? 0);
           drr.textContent = Number(k.drr ?? 0).toFixed(3);
 
-          // set submission time directly from JSON
+      
           if (sub.submitted_at_ist) {
             document.getElementById("lastUpdated").textContent = "Submitted at " + sub.submitted_at_ist;
           }
