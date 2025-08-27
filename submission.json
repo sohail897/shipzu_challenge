@@ -1,0 +1,15 @@
+{
+    "submitted_at_ist": "2025-08-26T22:28:55.876997+05:30",
+    "kpi": {
+        "delivered_percent": 28.16,
+        "rto_percent": 18.33,
+        "orders_at_risk": 26,
+        "drr": 2.143
+    },
+    "rules_thresholds": {
+        "delivered_percent": 85,
+        "rto_percent": 8,
+        "orders_at_risk": 20
+    },
+    "rules_triggers": []
+}
