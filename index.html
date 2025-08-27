@@ -14,6 +14,9 @@
       main { max-width: 980px; margin: 24px auto; padding: 0 16px; }
       .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; }
       .card { background: var(--card); border-radius: 16px; padding: 16px; box-shadow: 0 10px 24px rgba(0,0,0,0.15); }
+      .card.ok { background: color-mix(in srgb, var(--ok) 10%, var(--card)); border:1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
+      .card.warn { background: color-mix(in srgb, var(--warn) 10%, var(--card)); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+      .card.bad { background: color-mix(in srgb, var(--bad) 10%, var(--card)); border:1px solid color-mix(in srgb, var(--bad) 30%, transparent); }
       .kpi-title { font-size:14px; color: var(--muted); margin-bottom:6px; }
       .kpi-value { font-size:28px; font-weight:700; }
       .badge { display:inline-block; margin-top:8px; padding: 4px 8px; border-radius: 999px; font-size:12px; }
@@ -39,9 +42,9 @@
     <header>
       <div>
         <div class="brand">Shipzu Grid — Lite Challenge</div>
-        <div class="meta">IST timezone | Use thresholds to color the cards</div>
+        <div class="meta">IST timezone</div>
       </div>
-      <div class="meta" id="lastUpdated">Loading…</div>
+      <div class="meta" id="lastUpdated">Not submitted</div>
     </header>
     <main>
       <section class="panel">
@@ -64,22 +67,22 @@
       </section>
 
       <section class="grid">
-        <div class="card">
+        <div class="card" id="cardDelivered">
           <div class="kpi-title">Delivered %</div>
           <div class="kpi-value" id="deliveredPercent">–</div>
           <span class="badge" id="badgeDelivered">–</span>
         </div>
-        <div class="card">
+        <div class="card" id="cardRto">
           <div class="kpi-title">RTO %</div>
           <div class="kpi-value" id="rtoPercent">–</div>
           <span class="badge" id="badgeRto">–</span>
         </div>
-        <div class="card">
+        <div class="card" id="cardRisk">
           <div class="kpi-title">Orders at Risk</div>
           <div class="kpi-value" id="ordersAtRisk">–</div>
           <span class="badge" id="badgeRisk">–</span>
         </div>
-        <div class="card">
+        <div class="card ok">
           <div class="kpi-title">Daily Run Rate (DRR)</div>
           <div class="kpi-value" id="drr">–</div>
           <span class="badge ok">info</span>
@@ -87,11 +90,10 @@
       </section>
 
       <section class="card" style="margin-top:16px;">
-        <div class="row">
-          <div><strong>Rules Output</strong></div>
-          <div class="muted">Edit thresholds and click <em>Evaluate</em></div>
-        </div>
-        <ul id="rulesList" class="muted"><li>Loading…</li></ul>
+        <details>
+          <summary>Rules Output</summary>
+          <ul id="rulesList" class="muted"><li>Loading…</li></ul>
+        </details>
       </section>
 
       <section class="card" style="margin-top:16px;">
@@ -103,30 +105,32 @@
     </main>
 
     <footer>
-      Minimal static UI • Host on GitHub Pages / Vercel. <a href="submission.json" target="_blank" rel="noopener">Open submission.json</a>
+    <a href="submission.json" target="_blank" rel="noopener">Open submission.json</a>
     </footer>
 
     <script>
-      async function loadJSON(path) {
-        const res = await fetch(path, { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to load " + path);
-        return res.json();
-      }
       function setBadge(el, good, near=false) {
         el.className = "badge " + (good ? "ok" : (near ? "warn" : "bad"));
         el.textContent = good ? "OK" : (near ? "NEAR" : "ALERT");
+      }
+      function setCardColor(el, good, near=false) {
+        el.classList.remove("ok", "warn", "bad");
+        if (good) el.classList.add("ok");
+        else if (near) el.classList.add("warn");
+        else el.classList.add("bad");
       }
       function pct(n) { return Number(n).toFixed(2) + "%"; }
       function fmt(n) { return String(n); }
 
       async function main() {
         try {
-          const sub = await loadJSON("submission.json");
-          document.getElementById("lastUpdated").textContent = "Submitted at " + (sub.submitted_at_ist || "—");
+          const res = await fetch("submission.json", { cache: "no-store" });
+          if (!res.ok) throw new Error("Failed to load submission.json");
+          const sub = await res.json();
+
           const k = sub.kpi || {};
           const t = (sub.rules_thresholds) || { delivered_percent:85, rto_percent:8, orders_at_risk:20 };
 
-          // init fields
           tpDelivered.value = t.delivered_percent;
           tpRto.value = t.rto_percent;
           tpRisk.value = t.orders_at_risk;
@@ -135,13 +139,13 @@
           rtoPercent.textContent = pct(k.rto_percent ?? 0);
           ordersAtRisk.textContent = fmt(k.orders_at_risk ?? 0);
           drr.textContent = Number(k.drr ?? 0).toFixed(3);
+          
 
-          // initial evaluate
           evaluate(sub);
           btnEvaluate.addEventListener("click", () => evaluate(sub));
         } catch (e) {
           console.error(e);
-          rulesList.innerHTML = "<li>Could not load submission.json</li>";
+          document.getElementById("rulesList").innerHTML = "<li>Could not load submission.json</li>";
         }
       }
 
@@ -153,39 +157,45 @@
           orders_at_risk: Number(tpRisk.value),
         };
         const rules = [];
-        // Delivered %: higher is better
+
+        // --- update submission time on evaluate ---
+        const now = new Date();
+        const istOptions = { timeZone: 'Asia/Kolkata', hour12: false, 
+                             year: 'numeric', month: '2-digit', day: '2-digit',
+                             hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        const submittedTime = now.toLocaleString('sv-SE', istOptions);
+        document.getElementById("lastUpdated").textContent = "Submitted at " + submittedTime;
+        // ------------------------------------------
+
         const del = Number(k.delivered_percent || 0);
-        setBadge(
-          badgeDelivered,
-          del >= thr.delivered_percent,
-          del >= thr.delivered_percent * 0.9
-        );
+        const deliveredGood = del >= thr.delivered_percent;
+        const deliveredNear = del >= thr.delivered_percent * 0.9;
+        setBadge(badgeDelivered, deliveredGood, deliveredNear);
+        setCardColor(cardDelivered, deliveredGood, deliveredNear);
         if (del < thr.delivered_percent) rules.push({kpi:"delivered_percent", actual: del, target: thr.delivered_percent, severity:(del < thr.delivered_percent*0.9 ? "high":"medium")});
 
-        // RTO %: lower is better
         const rto = Number(k.rto_percent || 0);
-        const rto_ok = rto <= thr.rto_percent;
-        const rto_near = rto <= thr.rto_percent * 1.1;
-        setBadge(badgeRto, rto_ok, !rto_ok && rto_near);
-        if (!rto_ok) rules.push({kpi:"rto_percent", actual:rto, target: thr.rto_percent, severity:(rto > thr.rto_percent*1.1 ? "medium":"low")});
+        const rtoGood = rto <= thr.rto_percent;
+        const rtoNear = rto <= thr.rto_percent * 1.1;
+        setBadge(badgeRto, rtoGood, !rtoGood && rtoNear);
+        setCardColor(cardRto, rtoGood, rtoNear);
+        if (!rtoGood) rules.push({kpi:"rto_percent", actual:rto, target: thr.rto_percent, severity:(rto > thr.rto_percent*1.1 ? "medium":"low")});
 
-        // Orders at Risk: lower is better
         const risk = Number(k.orders_at_risk || 0);
-        const risk_ok = risk <= thr.orders_at_risk;
-        const risk_near = risk <= thr.orders_at_risk * 1.1;
-        setBadge(badgeRisk, risk_ok, !risk_ok && risk_near);
-        if (!risk_ok) rules.push({kpi:"orders_at_risk", actual:risk, target:thr.orders_at_risk, severity:(risk > thr.orders_at_risk*1.1 ? "medium":"low")});
+        const riskGood = risk <= thr.orders_at_risk;
+        const riskNear = risk <= thr.orders_at_risk * 1.1;
+        setBadge(badgeRisk, riskGood, !riskGood && riskNear);
+        setCardColor(cardRisk, riskGood, riskNear);
+        if (!riskGood) rules.push({kpi:"orders_at_risk", actual:risk, target:thr.orders_at_risk, severity:(risk > thr.orders_at_risk*1.1 ? "medium":"low")});
 
-        // Render rules list
         if (!rules.length) {
           rulesList.innerHTML = '<li class="ok">No alerts</li>';
         } else {
           rulesList.innerHTML = rules.map(r => `<li><strong>${r.kpi}</strong> ⇒ actual: <code>${r.actual.toFixed(2)}</code>, target: <code>${r.target}</code> <em>(${r.severity})</em></li>`).join("");
         }
 
-        // Output validation block
         const payload = {
-          submitted_at_ist: sub.submitted_at_ist || null,
+          submitted_at_ist: submittedTime,
           kpi: sub.kpi || {},
           thresholds_used: thr,
           rules_computed_client: rules
